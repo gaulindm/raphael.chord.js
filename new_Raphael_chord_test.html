@@ -48,7 +48,7 @@
     <div id="chord-container"></div>
 
     <script>
-        // Dynamic loading of instrument-specific chord data
+        // Load chord data dynamically based on instrument selection
         document.getElementById('instrument').addEventListener('change', (event) => {
             const instrument = event.target.value;
             const filePath = `${instrument}_chords.json`; // Construct JSON file path
@@ -58,7 +58,7 @@
                 .catch(error => console.error(`Error loading ${instrument} chord data:`, error));
         });
 
-        // Load data for the initially selected instrument
+        // Initial load for the default instrument
         const initialInstrument = document.getElementById('instrument').value;
         Raphael.chord.loadData(`${initialInstrument}_chords.json`)
             .then(() => console.log(`${initialInstrument} chord data loaded successfully`))
@@ -78,11 +78,10 @@
                 return;
             }
 
-            // Render the chord diagram
+            // Clear existing diagram and render the new chord
             const container = document.getElementById('chord-container');
-            container.innerHTML = ''; // Clear existing diagram
-            const stringCount = instrument === 'guitar' ? 6 : (instrument === 'ukulele' ? 4 : 5); // Adjust string count
-            Raphael.chord.render(container, chordData, stringCount);
+            container.innerHTML = ''; // Clear any existing diagram
+            new Raphael.chord.Chord(container, chordData, `${root} ${type}`);
         });
     </script>
 </body>
