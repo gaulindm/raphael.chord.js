@@ -32,37 +32,48 @@
      * @param {number} variation - Variation number (1-based index).
      * @returns {Array|undefined} - Chord data array or undefined if not found.
      */
+ 
     Raphael.chord.find = function (instrument, root, name, variation) {
         if (!Raphael.chord.data) {
             console.error("Chord data not loaded. Please load data using loadData method.");
             return undefined;
         }
-
+    
         const instrumentData = Raphael.chord.data.chords;
         if (!instrumentData) {
             console.error(`Instrument data not found.`);
             return undefined;
         }
-
+    
+        // Default to 'maj' if no chord type is provided
+        if (!name || name.trim() === "") {
+            name = "maj";
+        }
+    
         const chord = instrumentData.find(c => c.root === root);
         if (!chord) {
             console.error(`Chord root ${root} not found.`);
             return undefined;
         }
-
+    
         const type = chord.types.find(t => t.name === name);
         if (!type) {
             console.error(`Chord type ${name} not found for root ${root}.`);
             return undefined;
         }
-
+    
+        if (!variation || variation < 1) {
+            variation = 1;
+        }
+    
         if (variation > type.variations.length) {
             console.warn(`Variation ${variation} exceeds available variations. Defaulting to last variation.`);
             variation = type.variations.length;
         }
-
+    
         return type.variations[variation - 1];
     };
+    
 
     // Chord constructor to render diagrams
     var Chord = function (elementOrPosition, data, labelOrVariant) {
