@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ukulele Chord Diagrams</title>
+    <!-- Include Raphael.js for rendering vector graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+    <!-- Include your custom script for chord rendering -->
+    <script src="raphael.adaptivechord.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        /* Styling for chord containers */
+        .chord-container {
+            margin: 10px;
+            display: inline-block;
+            text-align: center; /* Center align the chord names below diagrams */
+        }
+        .chord-diagram {
+            width: 100px;
+            height: 120px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ukulele Chord Diagrams</h1>
+    <!-- Placeholder for chord diagrams -->
+    <div id="chord-diagrams"></div>
+
+    <script>
+        // Define the list of chords to render
+        const chordList = ['C', 'E6', 'Ebm7', 'Ebmaj7', 'F', 'Fmaj7', 'G']; 
+        const instrument = 'ukulele'; // Specify the instrument type
+
+        /**
+         * Function to load and render chord diagrams
+         */
+        async function renderChords() {
+            try {
+                // Load chord data from the JSON file
+                console.log("Loading chord data...");
+                await Raphael.chord.loadData('ukulele_chords.json'); // Update with your JSON path
+                console.log("Chord data loaded successfully!");
+
+                // Select the container for diagrams
+                const container = document.getElementById('chord-diagrams');
+
+                // Loop through each chord in the chord list
+                chordList.forEach(chordName => {
+                    console.log(`Processing chord: ${chordName}`);
+
+                    // Find the chord data by its name
+                    const chordData = Raphael.chord.find(instrument, chordName, 1);
+
+                    if (!chordData) {
+                        // Log a warning if the chord is not found
+                        console.warn(`Chord not found: ${chordName}`);
+                        return; // Skip rendering for this chord
+                    }
+
+                    console.log(`Found chord data for ${chordName}:`, chordData);
+
+                    // Create a container for this chord
+                    const chordContainer = document.createElement('div');
+                    chordContainer.className = 'chord-container';
+
+                    // Create a div for the chord diagram
+                    const diagramContainer = document.createElement('div');
+                    diagramContainer.className = 'chord-diagram';
+
+                    // Render the chord diagram inside the container
+                    console.log(`Rendering diagram for ${chordName}...`);
+                    new Raphael.chord.Chord(diagramContainer, chordData, chordName);
+
+                    // Append the diagram container and chord name to the chord container
+                    chordContainer.appendChild(diagramContainer);
+                    
+                    // Append the chord container to the main container
+                    container.appendChild(chordContainer);
+                });
+
+                console.log("All chords processed successfully!");
+            } catch (error) {
+                // Log any errors that occur during the process
+                console.error("Error rendering chords:", error);
+            }
+        }
+
+        // Call the function to render chords when the script is loaded
+        renderChords();
+    </script>
+</body>
+</html>
