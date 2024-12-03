@@ -135,13 +135,21 @@
             }
         });
 
-        // Add fret position marker (if offset > 0)
-        if (offset > 0) {
+        // Add fret position marker (if offset > 0 and not Infinity)
+        if (offset > 0 && isFinite(offset)) {
             this.element.text(15, 45, `${offset + 1}fr`).attr({
                 'font-size': 12,
                 'text-anchor': 'middle',
             });
-        }
+        } else {
+            // Draw nut if offset is 0 or Infinity
+            this.element.path('M20 30L80 30').attr({
+                'stroke-width': 3,
+                stroke: '#000',
+            });
+        }        
+
+        
 
         // Add chord label
         if (labelOrVariant) {
