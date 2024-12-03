@@ -1,108 +1,70 @@
-/*!
- * Chord 0.1.0 - Raphael plugin
- *
- * Copyright (c) 2011 Justin D'Arcangelo (http://twitter.com/justindarc)
- * Licensed under the MIT (http://www.opensource.org/licenses/mit-license.php) license.
- */
-
 (function (Raphael) {
-    Raphael.chord = function (elementOrPosition, data, labelOrVariant) {
-        return new Chord(elementOrPosition, data, labelOrVariant);
+    // Define the Raphael.chord namespace
+    Raphael.chord = {
+        data: null, // To store loaded chord data
     };
 
-    Raphael.chord.find = function (root, name, variation) {
-        if (!root) {
+    /**
+     * Load chord data from a specific JSON file.
+     * @param {string} url - Path to the JSON file.
+     * @returns {Promise<void>} - Resolves when data is loaded successfully.
+     */
+    Raphael.chord.loadData = async function (url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            const jsonData = await response.json();
+            Raphael.chord.data = jsonData;
+            console.log("Chord data loaded successfully:", jsonData);
+        } catch (error) {
+            console.error("Failed to load chord data:", error);
+            Raphael.chord.data = null; // Clear existing data on failure
+        }
+    };
+
+    /**
+     * Find a chord by instrument, root, type, and variation.
+     * @param {string} instrument - Name of the instrument.
+     * @param {string} root - Root note of the chord.
+     * @param {string} name - Chord type (e.g., maj, min).
+     * @param {number} variation - Variation number (1-based index).
+     * @returns {Array|undefined} - Chord data array or undefined if not found.
+     */
+    Raphael.chord.find = function (instrument, root, name, variation) {
+        if (!Raphael.chord.data) {
+            console.error("Chord data not loaded. Please load data using loadData method.");
             return undefined;
         }
 
-        if (!name) {
-            name = 'maj';
+        const instrumentData = Raphael.chord.data.chords;
+        if (!instrumentData) {
+            console.error(`Instrument data not found.`);
+            return undefined;
         }
 
-        if (!variation || variation < 1) {
-            variation = 1;
+        const chord = instrumentData.find(c => c.root === root);
+        if (!chord) {
+            console.error(`Chord root ${root} not found.`);
+            return undefined;
         }
 
-        for (var i = 0; i < Raphael.chord.data.length; i++) {
-            var chordObject = Raphael.chord.data[i];
-
-            for (var j = 0; j < chordObject.root.length; j++) {
-                if (root === chordObject.root[j]) {
-                    for (var k = 0; k < chordObject.types.length; k++) {
-                        if (name === chordObject.types[k].name) {
-                            if (variation > chordObject.types[k].variations.length) {
-                                variation = chordObject.types[k].variations.length;
-                            }
-
-                            return chordObject.types[k].variations[variation - 1];
-                        }
-                    }
-                }
-            }
+        const type = chord.types.find(t => t.name === name);
+        if (!type) {
+            console.error(`Chord type ${name} not found for root ${root}.`);
+            return undefined;
         }
 
-        return undefined;
+        if (variation > type.variations.length) {
+            console.warn(`Variation ${variation} exceeds available variations. Defaulting to last variation.`);
+            variation = type.variations.length;
+        }
+
+        return type.variations[variation - 1];
     };
 
-    // Default chord data
-    Raphael.chord.data = [
-        {
-            root: ['C'],
-            types: [
-                {
-                    name: 'maj',
-                    variations: [
-                        [0, 0, 0, 3], // Open C major
-                        [5, 4, 3, 3], // Barre chord
-                    ],
-                },
-                {
-                    name: 'min',
-                    variations: [
-                        [0, 3, 3, 3], // C minor
-                        [8, 7, 6, 6], // Barre chord
-                    ],
-                },
-                {
-                    name: '7',
-                    variations: [
-                        [0, 0, 0, 1], // C7
-                        [5, 4, 3, 4], // Barre chord
-                    ],
-                },
-            ],
-        },
-        {
-            root: ['D'],
-            types: [
-                {
-                    name: 'maj',
-                    variations: [
-                        [2, 2, 2, 0], // Open D major
-                        [7, 6, 5, 5], // Barre chord
-                    ],
-                },
-            ],
-        },
-    ];
-
-    // Function to load chord data from an external file
-    Raphael.chord.loadData = function (url) {
-        return fetch(url)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error('Failed to load chord data');
-                }
-                return response.json();
-            })
-            .then((data) => {
-                Raphael.chord.data = data;
-                console.log('Chord data loaded successfully:', data);
-            })
-            .catch((error) => console.error('Error loading chord data:', error));
-    };
-
-    // Chord drawing logic
+    // Chord constructor to render diagrams
     var Chord = function (elementOrPosition, data, labelOrVariant) {
         if (
             typeof elementOrPosition === 'object' &&
@@ -113,124 +75,89 @@
                 elementOrPosition.x,
                 elementOrPosition.y,
                 100,
-                100
+                120
             );
         } else {
-            this.element = Raphael(elementOrPosition, 100, 100);
+            this.element = Raphael(elementOrPosition, 100, 120);
         }
 
-        this.element.setViewBox(0, 0, 100, 100);
+        this.element.setViewBox(0, 0, 100, 120);
 
-        this.fret = 0;
+        const numStrings = data.length; // Determine the number of strings
+        const fretCount = 5; // Fixed number of frets
+        const fretboardWidth = 100; // Total width of the fretboard
+        const fretboardHeight = 90; // Total height of the fretboard
+        const stringSpacing = (fretboardWidth - 40) / (numStrings - 1); // Dynamic spacing between strings
+        const fretSpacing = fretboardHeight / fretCount; // Fixed spacing between frets
+
         this.frets = [];
-        this.lines = {};
+        this.strings = [];
+        this.chordData = data;
 
-        // Validate that the data is an array containing 6 elements.
-        if (typeof data === 'object' && data.length !== undefined && data.length === 6) {
-            this.data = data;
-
-            var min = 99;
-            var max = 0;
-
-            for (i = 0; i < 6; i++) {
-                min = this.data[i] < min && this.data[i] > 0 ? this.data[i] : min;
-                max = this.data[i] > max && this.data[i] > 0 ? this.data[i] : max;
-            }
-
-            if (max > 5) {
-                this.fret = min;
-            }
-
-            var offset = this.fret > 0 ? this.fret - 1 : 0;
-
-            for (i = 0; i < 6; i++) {
-                // Muted strings.
-                if (this.data[i] === -1) {
-                    this.frets[i] = this.element.path(
-                        'M' +
-                            (16 + 10 * i) +
-                            ' 7L' +
-                            (24 + 10 * i) +
-                            ' 15M' +
-                            (16 + 10 * i) +
-                            ' 15L' +
-                            (24 + 10 * i) +
-                            ' 7'
-                    );
-                }
-
-                // Open strings.
-                else if (this.data[i] === 0) {
-                    this.frets[i] = this.element.circle(20 + 10 * i, 11, 3.5);
-                }
-
-                // All other strings.
-                else {
-                    this.frets[i] = this.element
-                        .circle(20 + 10 * i, 15 + 10 * (this.data[i] - offset), 3.5)
-                        .attr({
-                            fill: '#000',
-                        });
-                }
-            }
-
-            if (this.fret > 0) {
-                this.element.text(84, 24, this.fret + 'fr');
-            } else {
-                this.lines.top = this.element.path(
-                    'M20 18L70 18L70 20L20 20L20 18'
-                ).attr({
-                    fill: '#000',
-                });
-            }
-
-            if (labelOrVariant) {
-                this.label = this.element.text(45, 78, labelOrVariant);
-            }
+        // Draw fretboard (frets and strings)
+        for (let i = 0; i <= fretCount; i++) {
+            const y = 30 + i * fretSpacing;
+            this.element.path(`M20 ${y}L80 ${y}`); // Horizontal frets
+        }
+        const stringPositions = []; // Store X-positions of strings
+        for (let i = 0; i < numStrings; i++) {
+            const x = 20 + i * stringSpacing;
+            stringPositions.push(x);
+            this.element.path(`M${x} 30L${x} ${30 + fretboardHeight}`); // Vertical strings
         }
 
-        // Otherwise, treat the data as a chord represented as a string (e.g.: "C maj").
-        else if (typeof data === 'string') {
-            var splitData = data.split(' ');
-            var variant = 1;
-
-            if (typeof labelOrVariant === 'number') {
-                variant = labelOrVariant;
-            }
-
-            this.element.remove();
-
-            if (splitData.length > 1) {
-                return new Chord(
-                    elementOrPosition,
-                    Raphael.chord.find(splitData[0], splitData[1], variant),
-                    splitData[0] + ' ' + splitData[1]
-                );
-            } else {
-                return new Chord(
-                    elementOrPosition,
-                    Raphael.chord.find(data, 'maj', variant),
-                    data
-                );
-            }
+        // Calculate the lowest fret to adjust the diagram (offset for partial chords)
+        const minFret = Math.min(...data.filter((f) => f > 0)) || 1; // Default to 1 if no frets are pressed
+        const offset = minFret > 3 ? minFret - 1 : 0; // Offset only for frets > 3
+       
+        // Draw a thick nut line if no offset
+        if (offset === 0) {
+            this.element.path(`M20 30L80 30`).attr({
+                'stroke-width': 3, // Thicker line
+                stroke: '#000',
+            });
         }
 
-        this.lines.horizontal = [];
-        this.lines.vertical = [];
+        // Draw chord positions
+        data.forEach((fret, index) => {
+            const x = stringPositions[index];
 
-        for (var i = 0; i < 6; i++) {
-            var position = 20 + 10 * i;
+            if (fret === -1) {
+                // Muted string
+                this.element.text(x, 20, 'x');
+            } else if (fret === 0) {
+                // Open string
+                this.element.circle(x, 23, 4).attr({ stroke: '#000', fill: '#fff' });
+            } else {
+                // Fretted note
+                const y = 30 + (fret - offset) * fretSpacing - fretSpacing / 2;
+                this.element.circle(x, y, 6).attr({ fill: '#000' });
+            }
+        });
 
-            this.lines.horizontal.push(
-                this.element.path('M20 ' + position + 'L70 ' + position)
-            );
-            this.lines.vertical.push(
-                this.element.path('M' + position + ' 20L' + position + ' 70')
-            );
+        // Add fret position marker (if offset > 0)
+        if (offset > 0) {
+            this.element.text(15, 45, `${offset + 1}fr`).attr({
+                'font-size': 12,
+                'text-anchor': 'middle',
+            });
+        }
+
+        // Add chord label
+        if (labelOrVariant) {
+            this.element.text(50, 8, labelOrVariant).attr({
+                'font-size': 14,
+                'font-weight': 'bold',
+                'text-anchor': 'middle',
+            });
         }
     };
 
     Chord.prototype.remove = function () {
         this.element.remove();
     };
+
+    // Expose the Chord constructor
+    Raphael.chord.Chord = Chord;
+
 })(window.Raphael);
